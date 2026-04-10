@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup, useMap,useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Polyline,Marker, Popup, useMap,useMapEvents } from "react-leaflet";
 import { useState, useEffect,useRef } from "react";
 import L from "leaflet"; // Added Leaflet import for custom icons
 import "leaflet/dist/leaflet.css";
@@ -33,35 +33,39 @@ const userLocationIcon = L.divIcon({
 
 // Smoothly flies to the selected place
     // 1. Update the component to accept setSelectedPlace
-function RecenterMap({ position, selectedPlace, setSelectedPlace }) {
-  const map = useMap();
-  const lastId = useRef(null);
 
-  // 2. Add an internal listener to "kill" the flight immediately on user touch
+    function RecenterMap({ position, selectedPlace, setSelectedPlace }) {
+  const map = useMap();
+  const hasInitialMoved = useRef(false); // Track if we've done the first GPS center
+  const lastFlownId = useRef(null);      // Track the last clicked town
+
   useMapEvents({
-    mousedown: () => {
-      setSelectedPlace(null);
-      lastId.current = null; // Reset ref so it's ready for a new selection later
-    },
-    dragstart: () => {
-      setSelectedPlace(null);
+    // The MOMENT the user interacts (drag, zoom, click), kill the auto-fly logic
+    movestart: (e) => {
+      // If the movement was triggered by the user (not code), stop the snap
+      if (e.originalEvent) {
+        setSelectedPlace(null);
+        lastFlownId.current = "user-controlled"; 
+      }
     }
   });
 
   useEffect(() => {
+    // PRIORITY 1: If a town is selected, go there.
     if (selectedPlace) {
       const currentId = selectedPlace.properties.place_id;
-      
-      // Only fly if it's a NEW selection and hasn't been cleared by a click
-      if (currentId !== lastId.current) {
+      if (currentId !== lastFlownId.current) {
         const coords = selectedPlace.geometry.coordinates;
         map.flyTo([coords[1], coords[0]], 15, { duration: 1.5 });
-        lastId.current = currentId;
+        lastFlownId.current = currentId;
       }
-    } else if (position && !lastId.current) {
-      map.flyTo(position, 11);
-      // We set a dummy ID so it doesn't keep snapping back to user position
-      lastId.current = "initial-load"; 
+      return; // Exit so we don't hit the GPS logic
+    }
+
+    // PRIORITY 2: Initial GPS center (Only happens ONCE per session)
+    if (position && !hasInitialMoved.current) {
+      map.setView(position, 11);
+      hasInitialMoved.current = true;
     }
   }, [position, selectedPlace, map]);
 
@@ -101,6 +105,8 @@ export default function MapView() {
   const [selectedPlace, setSelectedPlace] = useState(null);
   const [category, setCategory] = useState("all");
   const [hoverPlaceId, setHoverPlaceId] = useState(null);
+  const [routeCoords, setRouteCoords] = useState(null);
+  const [routeInfo, setRouteInfo] = useState(null);
 
   const API_KEY = "d37876d799ce48b28b05ab85a9ba19f5";
 
@@ -136,6 +142,46 @@ export default function MapView() {
     };
     fetchPlaces();
   }, [position]);
+useEffect(() => {
+  if (!position || !selectedPlace) {
+    setRouteCoords(null);
+    setRouteInfo(null);
+    return;
+  }
+
+    const fetchRoute = async () => {
+      try {
+        const [lat1, lon1] = position;
+        const [lon2, lat2] = selectedPlace.geometry.coordinates;
+
+        const res = await fetch(
+          `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`
+        );
+
+        const data = await res.json();
+
+        if (data.routes && data.routes.length > 0) {
+          const coords = data.routes[0].geometry.coordinates;
+
+          // convert [lon, lat] → [lat, lon]
+          const formatted = coords.map(([lon, lat]) => [lat, lon]);
+
+          const route = data.routes[0];
+
+              setRouteCoords(formatted);
+
+              setRouteInfo({
+                distance: (route.distance / 1000).toFixed(1), // km
+                duration: Math.round(route.duration / 60),   // minutes
+              });
+        }
+      } catch (err) {
+        console.error("Route error:", err);
+      }
+    };
+
+    fetchRoute();
+  }, [position, selectedPlace]);
 
   const handleSearch = async () => {
     if (!query) return;
@@ -176,6 +222,16 @@ export default function MapView() {
   };
 
   if (!ready) return <div>Loading map...</div>;
+  const routePosition =
+  position && selectedPlace
+    ? [
+        position,
+        [
+          selectedPlace.geometry.coordinates[1],
+          selectedPlace.geometry.coordinates[0],
+        ],
+      ]
+    : null;
 
   return (
     <div style={{ height: "100vh", display: "flex", fontFamily: 'sans-serif' }}>
@@ -243,7 +299,7 @@ export default function MapView() {
             attribution="© OpenStreetMap contributors"
           />
 
-          <RecenterMap position={position} selectedPlace={selectedPlace} />
+          <RecenterMap position={position} selectedPlace={selectedPlace} setSelectedPlace={setSelectedPlace} />
 
             <LocationButton position={position}/>
 
@@ -257,14 +313,20 @@ export default function MapView() {
 
           {places.map((place, index) => {
             const coords = place.geometry.coordinates;
-            const { name, categories, formatted, website, contact } = place.properties;
+            const { name, categories, formatted, website, contact,place_id } = place.properties;
             if (!coords || !name) return null;
             const meta = getPlaceMeta(categories);
+            const isActive =
+            selectedPlace?.properties?.place_id === place_id ||
+            hoverPlaceId === place_id;
+
+            const icon = createCustomIcon(meta.color, isActive);
 
             return (
               <Marker
-                key={index}
+                key={place_id || index}
                 position={[coords[1], coords[0]]}
+                icon={icon}
                 eventHandlers={{
                   mouseover: () => setHoverPlaceId(place.properties.place_id),
                   mouseout: () => setHoverPlaceId(null),
@@ -288,7 +350,41 @@ export default function MapView() {
               </Marker>
             );
           })}
+      {routeCoords && (
+        <Polyline
+          positions={routeCoords}
+          pathOptions={{
+            color: "#007bff",
+            weight: 6,
+            opacity: 0.9,
+            lineCap: "round",
+            lineJoin: "round",
+          }}
+        />
+      )}
         </MapContainer>
+        {routeInfo && (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: "20px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    background: "white",
+                    padding: "12px 20px",
+                    borderRadius: "12px",
+                    boxShadow: "0 6px 20px rgba(0,0,0,0.15)",
+                    zIndex: 2000,
+                    fontWeight: "600",
+                    display: "flex",
+                    gap: "15px",
+                    alignItems: "center"
+                  }}
+                >
+                  🚗 <span>{routeInfo.distance} km</span>
+                  ⏱ <span>{routeInfo.duration} min</span>
+                </div>
+              )}
       </div>
 
       {/* PULSE ANIMATION CSS */}
