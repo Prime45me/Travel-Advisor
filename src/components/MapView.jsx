@@ -1,5 +1,5 @@
-import { MapContainer, TileLayer, Polyline,Marker, Popup, useMap,useMapEvents } from "react-leaflet";
-import { useState, useEffect,useRef } from "react";
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap, useMapEvents } from "react-leaflet";
+import { useState, useEffect, useRef } from "react";
 import L from "leaflet"; // Added Leaflet import for custom icons
 import "leaflet/dist/leaflet.css";
 import Sidebar from "./Sidebar";
@@ -17,27 +17,28 @@ const userLocationIcon = L.divIcon({
   iconAnchor: [10, 10]
 });
 
-  function MapEventsHandler({ setSelectedPlace }) {
-    useMapEvents({
-      mousedown: () => {
-        // As soon as the user clicks to drag the map, 
-        // we clear the selected place so RecenterMap stops fighting them.
-        setSelectedPlace(null);
-      },
-      zoomstart: () => {
-        setSelectedPlace(null);
-      }
-    });
-    return null;
-  }
+function MapEventsHandler({ setSelectedPlace }) {
+  useMapEvents({
+    mousedown: () => {
+      // As soon as the user clicks to drag the map, 
+      // we clear the selected place so RecenterMap stops fighting them.
+      setSelectedPlace(null);
+    },
+    zoomstart: () => {
+      setSelectedPlace(null);
+    }
+  });
+  return null;
+}
 
 // Smoothly flies to the selected place
-    // 1. Update the component to accept setSelectedPlace
+// 1. Update the component to accept setSelectedPlace
 
-    function RecenterMap({ position, selectedPlace, setSelectedPlace }) {
+function RecenterMap({ position, selectedPlace, setSelectedPlace }) {
   const map = useMap();
   const hasInitialMoved = useRef(false); // Track if we've done the first GPS center
   const lastFlownId = useRef(null);      // Track the last clicked town
+  const lastPositionCoords = useRef(null); // Track the last searched coordinate string
 
   useMapEvents({
     // The MOMENT the user interacts (drag, zoom, click), kill the auto-fly logic
@@ -45,7 +46,8 @@ const userLocationIcon = L.divIcon({
       // If the movement was triggered by the user (not code), stop the snap
       if (e.originalEvent) {
         setSelectedPlace(null);
-        lastFlownId.current = "user-controlled"; 
+        lastFlownId.current = "user-controlled";
+        lastPositionCoords.current = "user-controlled";
       }
     }
   });
@@ -56,21 +58,52 @@ const userLocationIcon = L.divIcon({
       const currentId = selectedPlace.properties.place_id;
       if (currentId !== lastFlownId.current) {
         const coords = selectedPlace.geometry.coordinates;
-        map.flyTo([coords[1], coords[0]], 15, { duration: 1.5 });
+        const target = [coords[1], coords[0]];
+
+        // 2-Step Drop-in Animation (Google Earth style)
+        map.flyTo(target, 13, { duration: 2.0 }); // Stage 1: Fly above
+
+        map.once('moveend', () => {
+          // Ensure they didn't manually cancel by dragging (which changes lastFlownId)
+          if (lastFlownId.current === currentId) {
+            map.flyTo(target, 16, { duration: 1.5 }); // Stage 2: Dive in
+          }
+        });
+
         lastFlownId.current = currentId;
       }
       return; // Exit so we don't hit the GPS logic
     }
 
-    // PRIORITY 2: Initial GPS center (Only happens ONCE per session)
-    if (position && !hasInitialMoved.current) {
-      map.setView(position, 11);
-      hasInitialMoved.current = true;
+    // PRIORITY 2: Search Query / New Position Tracker
+    if (position) {
+      const posStr = `${position[0].toFixed(5)},${position[1].toFixed(5)}`;
+
+      if (!hasInitialMoved.current) {
+        // Initial load GPS center 
+        map.setView(position, 11);
+        hasInitialMoved.current = true;
+        lastPositionCoords.current = posStr;
+      }
+      else if (lastPositionCoords.current !== posStr) {
+        // The red pulse position changed (user searched for a new place)
+        lastPositionCoords.current = posStr;
+
+        // 2-Step Drop-in Animation for Search
+        map.flyTo(position, 13, { duration: 2.0 });
+
+        map.once('moveend', () => {
+          // Ensure map wasn't dragged mid-flight
+          if (lastPositionCoords.current === posStr) {
+            map.flyTo(position, 16, { duration: 1.5 });
+          }
+        });
+      }
     }
   }, [position, selectedPlace, map]);
 
   return null;
-}    
+}
 
 const createCustomIcon = (color, isActive) => L.divIcon({
   html: `
@@ -107,8 +140,8 @@ export default function MapView() {
   const [hoverPlaceId, setHoverPlaceId] = useState(null);
   const [routeCoords, setRouteCoords] = useState(null);
   const [routeInfo, setRouteInfo] = useState(null);
-
-  const API_KEY = "d37876d799ce48b28b05ab85a9ba19f5";
+  const [itinerary, setItinerary] = useState([]);
+  const [sidebarView, setSidebarView] = useState("explore");
 
   useEffect(() => {
     setTimeout(() => setReady(true), 100);
@@ -131,49 +164,81 @@ export default function MapView() {
     const fetchPlaces = async () => {
       try {
         const [lat, lon] = position;
+        // Geoapify requires [lat, lon] for circle center in fetch filter but order is circle:lon,lat
         const res = await fetch(
-          `https://api.geoapify.com/v2/places?categories=tourism.sights,accommodation.hotel,catering.restaurant&filter=circle:${lon},${lat},10000&limit=100&apiKey=${API_KEY}`
+          `https://api.geoapify.com/v2/places?categories=tourism.sights,accommodation.hotel,catering.restaurant&filter=circle:${lon},${lat},10000&limit=100&apiKey=${import.meta.env.VITE_GEOAPIFY_API_KEY}`
         );
         const data = await res.json();
-        setPlaces(data.features || []);
+
+        // Map Geoapify response back to the generic structure required by Sidebar
+        const mappedPlaces = (data.features || []).map(place => {
+          // Generate a deterministic pseudo-rating between 3.5 and 5.0 for UI testing since Geoapify doesn't have ratings
+          const pseudoRating = place.properties.place_id
+            ? 3.5 + ((place.properties.place_id.charCodeAt(0) + place.properties.place_id.length) % 16) / 10
+            : 4.0;
+
+          return {
+            properties: {
+              place_id: place.properties.place_id,
+              name: place.properties.name,
+              categories: place.properties.categories || [],
+              formatted: place.properties.formatted || "No address",
+              website: place.properties.website || null,
+              contact: { phone: place.properties.contact?.phone || null },
+              rating: pseudoRating,
+              photos: [] // Trigger Wikipedia fetch in Sidebar
+            },
+            geometry: {
+              coordinates: place.geometry.coordinates // [lon, lat]
+            }
+          };
+        });
+
+        setPlaces(mappedPlaces);
       } catch (err) {
         console.error("Fetch error:", err);
       }
     };
     fetchPlaces();
   }, [position]);
-useEffect(() => {
-  if (!position || !selectedPlace) {
-    setRouteCoords(null);
-    setRouteInfo(null);
-    return;
-  }
-
+  useEffect(() => {
     const fetchRoute = async () => {
       try {
-        const [lat1, lon1] = position;
-        const [lon2, lat2] = selectedPlace.geometry.coordinates;
+        let coordsString = "";
+
+        if (sidebarView === "itinerary" && itinerary.length > 0 && position) {
+          const [lat1, lon1] = position;
+          const itineraryCoords = itinerary.map(p => {
+            const [iLon, iLat] = p.geometry.coordinates;
+            return `${iLon},${iLat}`;
+          });
+          coordsString = `${lon1},${lat1};${itineraryCoords.join(';')}`;
+        } else if (position && selectedPlace) {
+          const [lat1, lon1] = position;
+          const [lon2, lat2] = selectedPlace.geometry.coordinates;
+          coordsString = `${lon1},${lat1};${lon2},${lat2}`;
+        } else {
+          setRouteCoords(null);
+          setRouteInfo(null);
+          return;
+        }
 
         const res = await fetch(
-          `https://router.project-osrm.org/route/v1/driving/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`
+          `https://router.project-osrm.org/route/v1/driving/${coordsString}?overview=full&geometries=geojson`
         );
 
         const data = await res.json();
 
         if (data.routes && data.routes.length > 0) {
           const coords = data.routes[0].geometry.coordinates;
-
-          // convert [lon, lat] → [lat, lon]
           const formatted = coords.map(([lon, lat]) => [lat, lon]);
-
           const route = data.routes[0];
 
-              setRouteCoords(formatted);
-
-              setRouteInfo({
-                distance: (route.distance / 1000).toFixed(1), // km
-                duration: Math.round(route.duration / 60),   // minutes
-              });
+          setRouteCoords(formatted);
+          setRouteInfo({
+            distance: (route.distance / 1000).toFixed(1), // km
+            duration: Math.round(route.duration / 60),   // minutes
+          });
         }
       } catch (err) {
         console.error("Route error:", err);
@@ -181,7 +246,7 @@ useEffect(() => {
     };
 
     fetchRoute();
-  }, [position, selectedPlace]);
+  }, [position, selectedPlace, sidebarView, itinerary]);
 
   const handleSearch = async () => {
     if (!query) return;
@@ -208,6 +273,17 @@ useEffect(() => {
     setSelectedPlace(place);
   };
 
+  const handleToggleItinerary = (place) => {
+    setItinerary(prev => {
+      const exists = prev.some(p => p.properties.place_id === place.properties.place_id);
+      if (exists) {
+        return prev.filter(p => p.properties.place_id !== place.properties.place_id);
+      } else {
+        return [...prev, place];
+      }
+    });
+  };
+
   useEffect(() => {
     const handleClickOutside = () => setSuggestions([]);
     window.addEventListener("click", handleClickOutside);
@@ -223,15 +299,15 @@ useEffect(() => {
 
   if (!ready) return <div>Loading map...</div>;
   const routePosition =
-  position && selectedPlace
-    ? [
+    position && selectedPlace
+      ? [
         position,
         [
           selectedPlace.geometry.coordinates[1],
           selectedPlace.geometry.coordinates[0],
         ],
       ]
-    : null;
+      : null;
 
   return (
     <div style={{ height: "100vh", display: "flex", fontFamily: 'sans-serif' }}>
@@ -244,6 +320,11 @@ useEffect(() => {
         userLocation={position}
         category={category}
         setCategory={setCategory}
+        routeInfo={routeInfo}
+        itinerary={itinerary}
+        toggleItinerary={handleToggleItinerary}
+        sidebarView={sidebarView}
+        setSidebarView={setSidebarView}
       />
 
       <div style={{ flex: 1, position: "relative" }}>
@@ -289,9 +370,9 @@ useEffect(() => {
           zoom={11}
           style={{ height: "100%", width: "100%" }}
           onMoveStart={() => {
-          // Optional: If you want to stop the "flyTo" if the user grabs the map mid-flight
-          if (selectedPlace) setSelectedPlace(null);
-        }}
+            // Optional: If you want to stop the "flyTo" if the user grabs the map mid-flight
+            if (selectedPlace) setSelectedPlace(null);
+          }}
         >
           <MapEventsHandler setSelectedPlace={setSelectedPlace} />
           <TileLayer
@@ -301,7 +382,7 @@ useEffect(() => {
 
           <RecenterMap position={position} selectedPlace={selectedPlace} setSelectedPlace={setSelectedPlace} />
 
-            <LocationButton position={position}/>
+          <LocationButton position={position} />
 
 
           {/* RED PULSE USER MARKER */}
@@ -313,12 +394,12 @@ useEffect(() => {
 
           {places.map((place, index) => {
             const coords = place.geometry.coordinates;
-            const { name, categories, formatted, website, contact,place_id } = place.properties;
+            const { name, categories, formatted, website, contact, place_id } = place.properties;
             if (!coords || !name) return null;
             const meta = getPlaceMeta(categories);
             const isActive =
-            selectedPlace?.properties?.place_id === place_id ||
-            hoverPlaceId === place_id;
+              selectedPlace?.properties?.place_id === place_id ||
+              hoverPlaceId === place_id;
 
             const icon = createCustomIcon(meta.color, isActive);
 
@@ -330,7 +411,8 @@ useEffect(() => {
                 eventHandlers={{
                   mouseover: () => setHoverPlaceId(place.properties.place_id),
                   mouseout: () => setHoverPlaceId(null),
-                  click: () => handlePlaceSelect(place) }}
+                  click: () => handlePlaceSelect(place)
+                }}
               >
                 <Popup>
                   <div style={{ minWidth: '150px' }}>
@@ -350,41 +432,41 @@ useEffect(() => {
               </Marker>
             );
           })}
-      {routeCoords && (
-        <Polyline
-          positions={routeCoords}
-          pathOptions={{
-            color: "#007bff",
-            weight: 6,
-            opacity: 0.9,
-            lineCap: "round",
-            lineJoin: "round",
-          }}
-        />
-      )}
+          {routeCoords && (
+            <Polyline
+              positions={routeCoords}
+              pathOptions={{
+                color: "#007bff",
+                weight: 6,
+                opacity: 0.9,
+                lineCap: "round",
+                lineJoin: "round",
+              }}
+            />
+          )}
         </MapContainer>
         {routeInfo && (
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: "20px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    background: "white",
-                    padding: "12px 20px",
-                    borderRadius: "12px",
-                    boxShadow: "0 6px 20px rgba(0,0,0,0.15)",
-                    zIndex: 2000,
-                    fontWeight: "600",
-                    display: "flex",
-                    gap: "15px",
-                    alignItems: "center"
-                  }}
-                >
-                  🚗 <span>{routeInfo.distance} km</span>
-                  ⏱ <span>{routeInfo.duration} min</span>
-                </div>
-              )}
+          <div
+            style={{
+              position: "absolute",
+              bottom: "20px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              background: "white",
+              padding: "12px 20px",
+              borderRadius: "12px",
+              boxShadow: "0 6px 20px rgba(0,0,0,0.15)",
+              zIndex: 2000,
+              fontWeight: "600",
+              display: "flex",
+              gap: "15px",
+              alignItems: "center"
+            }}
+          >
+            🚗 <span>{routeInfo.distance} km</span>
+            ⏱ <span>{routeInfo.duration} min</span>
+          </div>
+        )}
       </div>
 
       {/* PULSE ANIMATION CSS */}

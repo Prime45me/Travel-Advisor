@@ -6,10 +6,17 @@ export default function LocationButton({ position }) {
 
   const handleRecenter = () => {
     if (position) {
-      // Fly to user position with a high zoom level (15)
-      map.flyTo(position, 15, {
-        duration: 1.5,
-        easeLinearity: 0.25
+      // 2-Step Drop-in Animation (Google Earth style)
+      // Stage 1: Fly above the location
+      map.flyTo(position, 13, { duration: 2.0, easeLinearity: 0.25 });
+      
+      // Stage 2: Dive into street level
+      map.once('moveend', () => {
+        // Ensure user didn't drag map away mid-flight before zooming
+        const center = map.getCenter();
+        if (Math.abs(center.lat - position[0]) < 0.05 && Math.abs(center.lng - position[1]) < 0.05) {
+          map.flyTo(position, 17, { duration: 1.5 });
+        }
       });
     } else {
       console.warn("User position not yet acquired.");

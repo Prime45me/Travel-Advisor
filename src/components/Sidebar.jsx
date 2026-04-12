@@ -7,11 +7,37 @@ export default function Sidebar({
   userLocation,
   category,
   setCategory,
-  onHover,         // NEW: Prop from MapView to tell the map we are hovering
-  hoveredPlaceId   // NEW: Prop from MapView to tell us which marker is hovered
+  onHover,
+  hoverPlaceId,
+  routeInfo,
+  itinerary,
+  toggleItinerary,
+  sidebarView,
+  setSidebarView
 }) {
   const [images, setImages] = useState({});
-  const cardRefs = useRef({}); // NEW: Stores references to each card for auto-scroll
+  const cardRefs = useRef({});
+
+  const fetchImage = async (name) => {
+    try {
+      const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`);
+      const data = await res.json();
+      return data.thumbnail?.source || null;
+    } catch { return null; }
+  };
+
+  useEffect(() => {
+    const loadImages = async () => {
+      const newImages = {};
+      for (let place of places.slice(0, 10)) {
+        if (!place.properties.name) continue;
+        const img = await fetchImage(place.properties.name);
+        if (img) newImages[place.properties.name] = img;
+      }
+      setImages(newImages);
+    };
+    loadImages();
+  }, [places]);
 
   // Scroll to the card when a marker is clicked on the Map
   useEffect(() => {
@@ -22,18 +48,6 @@ export default function Sidebar({
       });
     }
   }, [selectedPlace]);
-
-  const fetchImage = async (name) => {
-    try {
-      const res = await fetch(
-        `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`
-      );
-      const data = await res.json();
-      return data.thumbnail?.source || null;
-    } catch {
-      return null;
-    }
-  };
 
   function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371;
@@ -48,26 +62,14 @@ export default function Sidebar({
   }
 
   const getPlaceMeta = (categories, placeId) => {
-    const seed = placeId ? placeId.split('').reduce((a, b) => a + b.charCodeAt(0), 0) % 1000 : 101;
+    const seed = placeId ? String(placeId).split('').reduce((a, b) => a + b.charCodeAt(0), 0) % 1000 : 101;
     if (!categories) return { type: 'Place', color: '#6c757d', img: `https://images.unsplash.com/photo-1499092346589-b9b6be3e94b2?auto=format&fit=crop&w=400&q=80&sig=${seed}` };
     if (categories.some(c => c.includes('hotel'))) return { type: 'Hotel', color: '#007bff', img: `https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=400&q=80&sig=${seed}` };
     if (categories.some(c => c.includes('restaurant'))) return { type: 'Restaurant', color: '#28a745', img: `https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=400&q=80&sig=${seed}` };
     return { type: 'Attraction', color: '#ffc107', img: `https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=400&q=80&sig=${seed}` };
   };
 
-  useEffect(() => {
-    const loadImages = async () => {
-      const newImages = {};
-      for (let place of places.slice(0, 10)) {
-        const name = place.properties.name;
-        if (!name) continue;
-        const img = await fetchImage(name);
-        if (img) newImages[name] = img;
-      }
-      setImages(newImages);
-    };
-    loadImages();
-  }, [places]);
+
 
   const filteredPlaces = places.filter((place) => {
     if (category === "all") return true;
@@ -78,34 +80,61 @@ export default function Sidebar({
     return true;
   });
 
+  const placesToRender = sidebarView === "explore" ? filteredPlaces : itinerary;
+
   return (
     <div style={{ width: "380px", height: "100vh", background: "#f8f9fb", overflowY: "auto", boxShadow: "4px 0 15px rgba(0,0,0,0.08)", fontFamily: "Segoe UI, sans-serif", scrollBehavior: "smooth" }}>
-      <div style={{ padding: "20px", background: "white", borderBottom: "1px solid #eee", position: "sticky", top: 0, zIndex: 10 }}>
-        <h2 style={{ margin: 0 }}>Explore</h2>
-        <div style={{ marginTop: "12px", display: "flex", gap: "6px", flexWrap: "wrap" }}>
-          {["all", "hotels", "restaurants", "attractions"].map((type) => (
-            <button
-              key={type}
-              onClick={() => setCategory(type)}
-              style={{ padding: "6px 12px", borderRadius: "20px", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "600", background: category === type ? "#007bff" : "#e9ecef", color: category === type ? "white" : "#333", transition: "all 0.2s ease" }}
-            >
-              {type.charAt(0).toUpperCase() + type.slice(1)}
-            </button>
-          ))}
+      <div style={{ padding: "20px 20px 10px 20px", background: "white", borderBottom: "1px solid #eee", position: "sticky", top: 0, zIndex: 10 }}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "12px" }}>
+          <button 
+            onClick={() => setSidebarView("explore")} 
+            style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "bold", background: sidebarView === "explore" ? "#000" : "#eee", color: sidebarView === "explore" ? "white" : "#333", transition: "0.2s" }}
+          >
+            Explore
+          </button>
+          <button 
+            onClick={() => setSidebarView("itinerary")} 
+            style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "bold", background: sidebarView === "itinerary" ? "#000" : "#eee", color: sidebarView === "itinerary" ? "white" : "#333", transition: "0.2s" }}
+          >
+            My Itinerary ({itinerary?.length || 0})
+          </button>
         </div>
+
+        {sidebarView === "explore" && (
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            {["all", "hotels", "restaurants", "attractions"].map((type) => (
+              <button
+                key={type}
+                onClick={() => setCategory(type)}
+                style={{ padding: "6px 12px", borderRadius: "20px", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: "600", background: category === type ? "#007bff" : "#e9ecef", color: category === type ? "white" : "#333", transition: "all 0.2s ease" }}
+              >
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ padding: "15px" }}>
-        {filteredPlaces.map((place) => {
-          const { name, categories, formatted, website, place_id } = place.properties;
+        {placesToRender.map((place) => {
+          const { name, categories, formatted, website, contact, place_id, rating, photos } = place.properties;
           const coords = place.geometry?.coordinates;
           if (!name || !coords) return null;
 
           const isSelected = selectedPlace?.properties?.place_id === place_id;
-          const isHovered = hoveredPlaceId === place_id; // Check if marker is hovered on map
+          const isHovered = hoverPlaceId === place_id; // Check if marker is hovered on map
           
           const meta = getPlaceMeta(categories, place_id);
-          const distance = userLocation ? calculateDistance(userLocation[0], userLocation[1], coords[1], coords[0]) : null;
+          
+          let displayDistance = null;
+          if (userLocation) {
+            if (isSelected && routeInfo) {
+              displayDistance = `🚗 ${routeInfo.distance} km`;
+            } else {
+              const straightLine = calculateDistance(userLocation[0], userLocation[1], coords[1], coords[0]);
+              displayDistance = `✈️ ${straightLine} km`;
+            }
+          }
 
           return (
             <div
@@ -131,13 +160,42 @@ export default function Sidebar({
                 <div style={{ position: "absolute", top: "10px", left: "10px", background: meta.color, color: "white", padding: "4px 10px", borderRadius: "10px", fontSize: "11px", fontWeight: "bold" }}>
                   {meta.type}
                 </div>
-                {distance && <div style={{ position: "absolute", bottom: "10px", right: "10px", background: "rgba(255,255,255,0.9)", padding: "4px 8px", borderRadius: "6px", fontSize: "12px" }}>📍 {distance} km</div>}
+                {rating && (
+                  <div style={{ position: "absolute", top: "10px", right: "10px", background: "#333", color: "#ffd700", padding: "4px 8px", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "4px", boxShadow: "0 2px 5px rgba(0,0,0,0.2)" }}>
+                    ⭐ {Number(rating).toFixed(1)}
+                  </div>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleItinerary(place); }}
+                  style={{
+                    position: "absolute", bottom: "10px", left: "10px", 
+                    background: itinerary.some(p => p.properties.place_id === place_id) ? "#ff4d4d" : "rgba(255,255,255,0.9)", 
+                    color: itinerary.some(p => p.properties.place_id === place_id) ? "white" : "#333", 
+                    border: "none", padding: "6px 15px", borderRadius: "20px", fontSize: "12px", fontWeight: "bold", cursor: "pointer",
+                    boxShadow: "0 2px 5px rgba(0,0,0,0.2)", transition: "0.2s"
+                  }}
+                >
+                  {itinerary.some(p => p.properties.place_id === place_id) ? "❤️ Saved" : "🤍 Save"}
+                </button>
+                {displayDistance && <div style={{ position: "absolute", bottom: "10px", right: "10px", background: "rgba(255,255,255,0.9)", padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "600", color: isSelected ? "#007bff" : "#555" }}>{displayDistance}</div>}
               </div>
 
-              <div style={{ padding: "14px" }}>
-                <h4 style={{ margin: "0 0 6px 0" }}>{name}</h4>
-                <p style={{ fontSize: "13px", color: "#666", marginBottom: "10px" }}>{formatted}</p>
-                {website && <a href={website} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ fontSize: "12px", color: meta.color, fontWeight: "600", textDecoration: "none" }}>Visit Website →</a>}
+              <div style={{ padding: "16px" }}>
+                <h4 style={{ margin: "0 0 6px 0", fontSize: "15px", color: "#222", lineHeight: "1.3" }}>{name}</h4>
+                <p style={{ fontSize: "12px", color: "#777", marginBottom: "16px", lineHeight: "1.4" }}>{formatted}</p>
+                
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                  {contact?.phone && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "#555", background: "#f0f2f5", padding: "6px 10px", borderRadius: "8px", fontWeight: "600" }} onClick={(e) => { e.stopPropagation(); window.location.href = `tel:${contact.phone}`; }}>
+                      📞 <span>{contact.phone}</span>
+                    </div>
+                  )}
+                  {website && (
+                    <a href={website} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", color: "white", background: meta.color, padding: "6px 12px", borderRadius: "8px", textDecoration: "none", fontWeight: "600", transition: "all 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.opacity = 0.85} onMouseLeave={(e) => e.currentTarget.style.opacity = 1}>
+                      🌐 <span>Website</span>
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           );
