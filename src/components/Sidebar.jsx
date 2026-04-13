@@ -28,15 +28,23 @@ export default function Sidebar({
 
   useEffect(() => {
     const loadImages = async () => {
+      const placesWithNames = places.filter(p => p.properties.name);
+      const results = await Promise.allSettled(
+        placesWithNames.map(async (place) => {
+          const name = place.properties.name;
+          const img = await fetchImage(name);
+          return { name, img };
+        })
+      );
       const newImages = {};
-      for (let place of places.slice(0, 10)) {
-        if (!place.properties.name) continue;
-        const img = await fetchImage(place.properties.name);
-        if (img) newImages[place.properties.name] = img;
-      }
-      setImages(newImages);
+      results.forEach(result => {
+        if (result.status === "fulfilled" && result.value.img) {
+          newImages[result.value.name] = result.value.img;
+        }
+      });
+      setImages(prev => ({ ...prev, ...newImages }));
     };
-    loadImages();
+    if (places.length > 0) loadImages();
   }, [places]);
 
   // Scroll to the card when a marker is clicked on the Map
