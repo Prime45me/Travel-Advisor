@@ -140,6 +140,22 @@ export default function DetailsPanel({ place, onClose, isMobile, wikiData }) {
                 {wikiData[place.properties.name].extract}
               </div>
             )}
+
+            {wikiData?.[place.properties.name]?.photos?.length > 1 && (
+              <div style={{ marginTop: "15px", borderTop: "1px solid #eee", paddingTop: "15px" }}>
+                <strong style={{ display: "block", fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px" }}>Real Photos (Nearby)</strong>
+                <div style={{ display: "flex", gap: "10px", overflowX: "auto", paddingBottom: "10px", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+                  {wikiData[place.properties.name].photos.slice(1).map((photo, i) => (
+                    <img 
+                      key={i} 
+                      src={photo} 
+                      alt={`Nearby view ${i}`} 
+                      style={{ height: "100px", minWidth: "140px", borderRadius: "10px", objectFit: "cover", flexShrink: 0, border: "1px solid #eef2f6" }} 
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div style={{ display: "flex", gap: "10px" }}>

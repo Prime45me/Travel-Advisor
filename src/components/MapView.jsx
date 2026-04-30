@@ -114,27 +114,43 @@ export default function MapView() {
     fetchPlaces();
   }, [position]);
 
-  // Wikipedia Data Fetching
+  // Wikipedia & Commons Data Fetching
   useEffect(() => {
-    const fetchWikiInfo = async (name) => {
+    const fetchWikiInfo = async (name, lat, lon) => {
       try {
-        const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`);
-        if (!res.ok) return null;
-        const data = await res.json();
+        // 1. Get Summary from Wikipedia
+        const summaryRes = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`);
+        const summaryData = summaryRes.ok ? await summaryRes.json() : null;
+
+        // 2. Get Nearby Photos from Wikimedia Commons
+        const photosRes = await fetch(
+          `https://commons.wikimedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${lat}|${lon}&ggsradius=250&ggsnamespace=6&prop=imageinfo&iilimit=10&iiprop=url&iiurlwidth=800&format=json&origin=*`
+        );
+        const photosData = await photosRes.json();
+        
+        let photos = [];
+        if (photosData.query?.pages) {
+          photos = Object.values(photosData.query.pages)
+            .map(page => page.imageinfo?.[0]?.thumburl || page.imageinfo?.[0]?.url)
+            .filter(Boolean);
+        }
+
         return {
-          img: data.thumbnail?.source || null,
-          extract: data.extract || null
+          img: summaryData?.thumbnail?.source || photos[0] || null,
+          extract: summaryData?.extract || null,
+          photos: photos.length > 0 ? photos : (summaryData?.thumbnail?.source ? [summaryData.thumbnail.source] : [])
         };
       } catch { return null; }
     };
 
     const loadWiki = async () => {
-      const placesWithNames = places.filter(p => p.properties.name);
+      const placesWithNames = places.filter(p => p.properties.name && p.geometry?.coordinates);
       const results = await Promise.allSettled(
         placesWithNames.map(async (place) => {
           const name = place.properties.name;
+          const [lon, lat] = place.geometry.coordinates;
           if (wikiData[name]) return null;
-          const info = await fetchWikiInfo(name);
+          const info = await fetchWikiInfo(name, lat, lon);
           return { name, info };
         })
       );
