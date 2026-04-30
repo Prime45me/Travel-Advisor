@@ -67,9 +67,46 @@ export default function DetailsPanel({ place, onClose, isMobile }) {
             {place.properties.name}
           </h2>
 
-          <p style={{ color: "#666", fontSize: "14px", lineHeight: "1.5", marginBottom: "20px" }}>
+          <p style={{ color: "#666", fontSize: "14px", lineHeight: "1.5", marginBottom: "15px" }}>
             {place.properties.formatted}
           </p>
+
+          <div style={{ marginBottom: "20px" }}>
+            {place.properties.opening_hours && (
+              <div style={{ marginBottom: "8px", fontSize: "13px", color: "#444", display: "flex", gap: "8px" }}>
+                <span>🕒</span>
+                <div>
+                  <strong style={{ display: "block", fontSize: "11px", color: "#888", textTransform: "uppercase" }}>Opening Hours</strong>
+                  {place.properties.opening_hours}
+                </div>
+              </div>
+            )}
+            
+            <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginBottom: "15px" }}>
+              {place.properties.contact?.phone && (
+                <div style={{ fontSize: "13px", color: "#444" }}>
+                  <strong style={{ display: "block", fontSize: "11px", color: "#888", textTransform: "uppercase" }}>Phone</strong>
+                  {place.properties.contact.phone}
+                </div>
+              )}
+              {place.properties.contact?.email && (
+                <div style={{ fontSize: "13px", color: "#444" }}>
+                  <strong style={{ display: "block", fontSize: "11px", color: "#888", textTransform: "uppercase" }}>Email</strong>
+                  {place.properties.contact.email}
+                </div>
+              )}
+            </div>
+
+            {place.properties.facilities && (
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "10px" }}>
+                 {Object.entries(place.properties.facilities).filter(([_, v]) => v === true).map(([key]) => (
+                   <span key={key} style={{ background: "#f0f2f5", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", color: "#555" }}>
+                     ✓ {key.replace(/_/g, ' ')}
+                   </span>
+                 ))}
+              </div>
+            )}
+          </div>
 
           <div style={{ display: "flex", gap: "10px" }}>
             {place.properties.website && (

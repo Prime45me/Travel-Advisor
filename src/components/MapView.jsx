@@ -189,8 +189,32 @@ export default function MapView() {
     setSuggestions([]);
   };
 
-  const handlePlaceSelect = (place) => {
+  const handlePlaceSelect = async (place) => {
     setSelectedPlace(place);
+    if (!place?.properties?.place_id) return;
+
+    try {
+      const res = await fetch(
+        `https://api.geoapify.com/v2/place-details?id=${place.properties.place_id}&apiKey=${import.meta.env.VITE_GEOAPIFY_API_KEY}`
+      );
+      const data = await res.json();
+      if (data.features && data.features.length > 0) {
+        const fullDetails = data.features[0].properties;
+        // Merge the details into the selected place
+        setSelectedPlace(prev => {
+          if (!prev || prev.properties.place_id !== place.properties.place_id) return prev;
+          return {
+            ...prev,
+            properties: {
+              ...prev.properties,
+              ...fullDetails
+            }
+          };
+        });
+      }
+    } catch (err) {
+      console.error("Details fetch error:", err);
+    }
   };
 
   const handleToggleItinerary = (place) => {

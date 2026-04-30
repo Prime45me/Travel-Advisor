@@ -21,36 +21,40 @@ export default function Sidebar({
   mobileSheetState,
   setMobileSheetState
 }) {
-  const [images, setImages] = useState({});
+  const [wikiData, setWikiData] = useState({}); // Stores { [name]: { img, extract } }
   const cardRefs = useRef({});
 
-  const fetchImage = async (name) => {
+  const fetchWikiInfo = async (name) => {
     try {
       const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`);
+      if (!res.ok) return null;
       const data = await res.json();
-      return data.thumbnail?.source || null;
+      return {
+        img: data.thumbnail?.source || null,
+        extract: data.extract || null
+      };
     } catch { return null; }
   };
 
   useEffect(() => {
-    const loadImages = async () => {
+    const loadWiki = async () => {
       const placesWithNames = places.filter(p => p.properties.name);
       const results = await Promise.allSettled(
         placesWithNames.map(async (place) => {
           const name = place.properties.name;
-          const img = await fetchImage(name);
-          return { name, img };
+          const info = await fetchWikiInfo(name);
+          return { name, info };
         })
       );
-      const newImages = {};
+      const newWiki = {};
       results.forEach(result => {
-        if (result.status === "fulfilled" && result.value.img) {
-          newImages[result.value.name] = result.value.img;
+        if (result.status === "fulfilled" && result.value.info) {
+          newWiki[result.value.name] = result.value.info;
         }
       });
-      setImages(prev => ({ ...prev, ...newImages }));
+      setWikiData(prev => ({ ...prev, ...newWiki }));
     };
-    if (places.length > 0) loadImages();
+    if (places.length > 0) loadWiki();
   }, [places]);
 
   useEffect(() => {
@@ -316,7 +320,7 @@ export default function Sidebar({
                     }}
                   >
                     <div style={{ position: "relative", height: "160px" }}>
-                      <img src={images[name] || meta.img} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      <img src={wikiData[name]?.img || meta.img} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       <div style={{ position: "absolute", top: "10px", left: "10px", background: meta.color, color: "white", padding: "4px 10px", borderRadius: "10px", fontSize: "11px", fontWeight: "bold" }}>
                         {meta.type}
                       </div>
@@ -360,7 +364,9 @@ export default function Sidebar({
                           </div>
                         )}
                       </div>
-                      <p style={{ fontSize: "12px", color: subtextColor, marginBottom: "16px", lineHeight: "1.4" }}>{formatted}</p>
+                      <p style={{ fontSize: "12px", color: subtextColor, marginBottom: "16px", lineHeight: "1.4", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                        {wikiData[name]?.extract || formatted}
+                      </p>
                       
                       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
                         {contact?.phone && (
