@@ -32,6 +32,17 @@ export default function MapView() {
   const [itinerary, setItinerary] = useState([]);
   const [sidebarView, setSidebarView] = useState("explore");
   const [droppedPin, setDroppedPin] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [mobileSheetState, setMobileSheetState] = useState("collapsed");
+
+  // Resize listener for mobile detection
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
 
   // --- EFFECTS ---
 
@@ -57,18 +68,16 @@ export default function MapView() {
   // Fetch nearby places from Geoapify
   useEffect(() => {
     if (!position) return;
+    setLoading(true);
     const fetchPlaces = async () => {
       try {
         const [lat, lon] = position;
-        // Geoapify requires [lat, lon] for circle center in fetch filter but order is circle:lon,lat
         const res = await fetch(
-          `https://api.geoapify.com/v2/places?categories=tourism.sights,accommodation.hotel,catering.restaurant&filter=circle:${lon},${lat},10000&limit=100&apiKey=${import.meta.env.VITE_GEOAPIFY_API_KEY}`
+          `https://api.geoapify.com/v2/places?categories=tourism.sights,accommodation.hotel,catering.restaurant,commercial.shopping_mall,commercial.supermarket&filter=circle:${lon},${lat},10000&bias=proximity:${lon},${lat}&limit=100&apiKey=${import.meta.env.VITE_GEOAPIFY_API_KEY}`
         );
         const data = await res.json();
 
-        // Map Geoapify response back to the generic structure required by Sidebar
         const mappedPlaces = (data.features || []).map(place => {
-          // Generate a deterministic pseudo-rating between 3.5 and 5.0 for UI testing since Geoapify doesn't have ratings
           const pseudoRating = place.properties.place_id
             ? 3.5 + ((place.properties.place_id.charCodeAt(0) + place.properties.place_id.length) % 16) / 10
             : 4.0;
@@ -80,9 +89,13 @@ export default function MapView() {
               categories: place.properties.categories || [],
               formatted: place.properties.formatted || "No address",
               website: place.properties.website || null,
-              contact: { phone: place.properties.contact?.phone || null },
+              contact: { 
+                phone: place.properties.contact?.phone || null,
+                email: place.properties.contact?.email || null
+              },
+              opening_hours: place.properties.opening_hours || null,
               rating: pseudoRating,
-              photos: [] // Trigger Wikipedia fetch in Sidebar
+              photos: []
             },
             geometry: {
               coordinates: place.geometry.coordinates // [lon, lat]
@@ -93,6 +106,8 @@ export default function MapView() {
         setPlaces(mappedPlaces);
       } catch (err) {
         console.error("Fetch error:", err);
+      } finally {
+        setLoading(false);
       }
     };
     fetchPlaces();
@@ -100,7 +115,6 @@ export default function MapView() {
 
   // Fetch driving route
   useEffect(() => {
-    // Guard: only fetch route when we actually have something to route to
     const hasItineraryRoute = sidebarView === "itinerary" && itinerary.length > 0 && position;
     const hasSingleRoute = position && selectedPlace;
 
@@ -210,6 +224,10 @@ export default function MapView() {
         toggleItinerary={handleToggleItinerary}
         sidebarView={sidebarView}
         setSidebarView={setSidebarView}
+        loading={loading}
+        isMobile={isMobile}
+        mobileSheetState={mobileSheetState}
+        setMobileSheetState={setMobileSheetState}
       />
 
       <div style={{ flex: 1, position: "relative" }}>
@@ -220,9 +238,9 @@ export default function MapView() {
           setSuggestions={setSuggestions}
           onSearch={handleSearch}
           onSelect={handleSelect}
+          isMobile={isMobile}
         />
 
-        {/* GPS denial warning banner */}
         {geoError && (
           <div style={{ position: "absolute", top: "60px", left: "50%", transform: "translateX(-50%)", zIndex: 1001, background: "#fff3cd", color: "#856404", padding: "8px 16px", borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", fontSize: "13px", fontWeight: "500", display: "flex", alignItems: "center", gap: "8px" }}>
             ⚠️ Location access denied — showing default area. Use the search bar to navigate.
@@ -238,13 +256,12 @@ export default function MapView() {
           <MapEventsHandler setSelectedPlace={setSelectedPlace} setDroppedPin={setDroppedPin} />
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution="© OpenStreetMap contributors"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
 
           <RecenterMap position={position} selectedPlace={selectedPlace} setSelectedPlace={setSelectedPlace} />
           <LocationButton position={position} />
 
-          {/* RED PULSE USER MARKER */}
           {position && (
             <Marker position={position} icon={userLocationIcon}>
               <Popup>You are here</Popup>
@@ -271,7 +288,38 @@ export default function MapView() {
         </MapContainer>
 
         <RouteInfoBadge routeInfo={routeInfo} />
-        <DetailsPanel place={selectedPlace} onClose={() => setSelectedPlace(null)} />
+        <DetailsPanel 
+          place={selectedPlace} 
+          onClose={() => setSelectedPlace(null)} 
+          isMobile={isMobile}
+        />
+
+        {/* Floating Action Button for Mobile Toggle */}
+        {isMobile && !selectedPlace && (
+          <button
+            onClick={() => setMobileSheetState(prev => prev === "full" ? "collapsed" : "full")}
+            style={{
+              position: "absolute",
+              bottom: "40px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 3000,
+              background: "#000",
+              color: "white",
+              border: "none",
+              padding: "12px 24px",
+              borderRadius: "30px",
+              fontWeight: "bold",
+              boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              cursor: "pointer"
+            }}
+          >
+            {mobileSheetState === "full" ? "🗺️ Show Map" : "📋 Show List"}
+          </button>
+        )}
       </div>
 
       <MapStyles />
