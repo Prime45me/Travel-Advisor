@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function DetailsPanel({ place, onClose, isMobile, wikiData }) {
+export default function DetailsPanel({ place, onClose, isMobile }) {
   const renderStars = (rating) => {
     const fullStars = Math.floor(rating || 0);
     return (
@@ -80,15 +80,8 @@ export default function DetailsPanel({ place, onClose, isMobile, wikiData }) {
           >
             ✕
           </button>
-
-          {wikiData?.[place.properties.name]?.img && (
-            <div style={{ width: "calc(100% + 40px)", margin: "-24px -20px 20px -20px", height: "200px", position: "relative", overflow: "hidden", borderRadius: isMobile ? "28px 28px 0 0" : "24px 24px 0 0" }}>
-              <img src={wikiData[place.properties.name].img} alt={place.properties.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "60px", background: "linear-gradient(to top, rgba(0,0,0,0.4), transparent)" }} />
-            </div>
-          )}
-
-          <h2 style={{ marginTop: isMobile && !wikiData?.[place.properties.name]?.img ? "10px" : 0, fontSize: isMobile ? "20px" : "24px", color: "#222", marginBottom: "8px" }}>
+ 
+          <h2 style={{ marginTop: isMobile ? "10px" : 0, fontSize: isMobile ? "20px" : "24px", color: "#222", marginBottom: "12px" }}>
             {place.properties.name}
           </h2>
           
@@ -131,29 +124,6 @@ export default function DetailsPanel({ place, onClose, isMobile, wikiData }) {
                      {key.replace(/_/g, ' ')}
                    </span>
                  ))}
-              </div>
-            )}
-
-            {wikiData?.[place.properties.name]?.extract && (
-              <div style={{ marginTop: "12px", fontSize: "13px", color: "#555", lineHeight: "1.6", borderTop: "1px solid #eee", paddingTop: "12px" }}>
-                <strong style={{ display: "block", fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>About</strong>
-                {wikiData[place.properties.name].extract}
-              </div>
-            )}
-
-            {wikiData?.[place.properties.name]?.photos?.length > 1 && (
-              <div style={{ marginTop: "15px", borderTop: "1px solid #eee", paddingTop: "15px" }}>
-                <strong style={{ display: "block", fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "10px" }}>Real Photos (Nearby)</strong>
-                <div style={{ display: "flex", gap: "10px", overflowX: "auto", paddingBottom: "10px", scrollbarWidth: "none", msOverflowStyle: "none" }}>
-                  {wikiData[place.properties.name].photos.slice(1).map((photo, i) => (
-                    <img 
-                      key={i} 
-                      src={photo} 
-                      alt={`Nearby view ${i}`} 
-                      style={{ height: "100px", minWidth: "140px", borderRadius: "10px", objectFit: "cover", flexShrink: 0, border: "1px solid #eef2f6" }} 
-                    />
-                  ))}
-                </div>
               </div>
             )}
           </div>

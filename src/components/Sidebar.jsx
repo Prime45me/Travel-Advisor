@@ -19,8 +19,7 @@ export default function Sidebar({
   loading,
   isMobile,
   mobileSheetState,
-  setMobileSheetState,
-  wikiData
+  setMobileSheetState
 }) {
   const cardRefs = useRef({});
 
@@ -305,7 +304,7 @@ export default function Sidebar({
                     }}
                   >
                     <div style={{ position: "relative", height: "160px" }}>
-                      <img src={wikiData[name]?.img || meta.img} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      <img src={meta.img} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       <div style={{ position: "absolute", top: "10px", left: "10px", background: meta.color, color: "white", padding: "4px 10px", borderRadius: "10px", fontSize: "11px", fontWeight: "bold" }}>
                         {meta.type}
                       </div>
@@ -363,9 +362,7 @@ export default function Sidebar({
                           </div>
                         )}
                       </div>
-                      <p style={{ fontSize: "12px", color: subtextColor, marginBottom: "16px", lineHeight: "1.4", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                        {wikiData[name]?.extract || formatted}
-                      </p>
+                      <p style={{ fontSize: "12px", color: subtextColor, marginBottom: "16px", lineHeight: "1.4" }}>{formatted}</p>
 
                       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
                         {contact?.phone && (

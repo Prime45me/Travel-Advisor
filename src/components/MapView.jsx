@@ -35,7 +35,6 @@ export default function MapView() {
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [mobileSheetState, setMobileSheetState] = useState("collapsed");
-  const [wikiData, setWikiData] = useState({});
 
   // Resize listener for mobile detection
   useEffect(() => {
@@ -105,6 +104,9 @@ export default function MapView() {
         });
 
         setPlaces(mappedPlaces);
+        // Clear route when a new search/category change happens
+        setRouteCoords(null);
+        setRouteInfo(null);
       } catch (err) {
         console.error("Fetch error:", err);
       } finally {
@@ -114,67 +116,17 @@ export default function MapView() {
     fetchPlaces();
   }, [position]);
 
-  // Wikipedia & Commons Data Fetching
-  useEffect(() => {
-    const fetchWikiInfo = async (name, lat, lon) => {
-      try {
-        // 1. Get Summary from Wikipedia
-        const summaryRes = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`);
-        const summaryData = summaryRes.ok ? await summaryRes.json() : null;
 
-        // 2. Get Nearby Photos from Wikimedia Commons
-        const photosRes = await fetch(
-          `https://commons.wikimedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${lat}|${lon}&ggsradius=250&ggsnamespace=6&prop=imageinfo&iilimit=10&iiprop=url&iiurlwidth=800&format=json&origin=*`
-        );
-        const photosData = await photosRes.json();
-        
-        let photos = [];
-        if (photosData.query?.pages) {
-          photos = Object.values(photosData.query.pages)
-            .map(page => page.imageinfo?.[0]?.thumburl || page.imageinfo?.[0]?.url)
-            .filter(Boolean);
-        }
-
-        return {
-          img: summaryData?.thumbnail?.source || photos[0] || null,
-          extract: summaryData?.extract || null,
-          photos: photos.length > 0 ? photos : (summaryData?.thumbnail?.source ? [summaryData.thumbnail.source] : [])
-        };
-      } catch { return null; }
-    };
-
-    const loadWiki = async () => {
-      const placesWithNames = places.filter(p => p.properties.name && p.geometry?.coordinates);
-      const results = await Promise.allSettled(
-        placesWithNames.map(async (place) => {
-          const name = place.properties.name;
-          const [lon, lat] = place.geometry.coordinates;
-          if (wikiData[name]) return null;
-          const info = await fetchWikiInfo(name, lat, lon);
-          return { name, info };
-        })
-      );
-      const newWiki = {};
-      results.forEach(result => {
-        if (result.status === "fulfilled" && result.value?.info) {
-          newWiki[result.value.name] = result.value.info;
-        }
-      });
-      if (Object.keys(newWiki).length > 0) {
-        setWikiData(prev => ({ ...prev, ...newWiki }));
-      }
-    };
-    if (places.length > 0) loadWiki();
-  }, [places]);
 
   // Fetch driving route
   useEffect(() => {
     const hasItineraryRoute = sidebarView === "itinerary" && itinerary.length > 0 && position;
     const hasSingleRoute = position && selectedPlace;
 
+    // Only clear route if we explicitly want to reset everything (like on a new category search)
+    // but NOT when just closing the details panel
     if (!hasItineraryRoute && !hasSingleRoute) {
-      setRouteCoords(null);
-      setRouteInfo(null);
+      // If we already have a route and just closed the panel, don't clear it yet!
       return;
     }
 
@@ -306,7 +258,6 @@ export default function MapView() {
         isMobile={isMobile}
         mobileSheetState={mobileSheetState}
         setMobileSheetState={setMobileSheetState}
-        wikiData={wikiData}
       />
 
       <div style={{ flex: 1, position: "relative" }}>
@@ -371,7 +322,6 @@ export default function MapView() {
           place={selectedPlace}
           onClose={() => setSelectedPlace(null)}
           isMobile={isMobile}
-          wikiData={wikiData}
         />
 
         {/* Floating Action Button for Mobile Toggle */}
