@@ -151,6 +151,33 @@ export default function DetailsPanel({ place, onClose, isMobile }) {
                 Visit Website
               </a>
             )}
+            <a
+              href={`https://www.google.com/maps/search/${encodeURIComponent(place.properties.name + " " + place.properties.formatted)}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                flex: 1,
+                textAlign: "center",
+                background: "white",
+                color: "#4285F4",
+                padding: "14px",
+                borderRadius: "14px",
+                textDecoration: "none",
+                fontWeight: "600",
+                fontSize: "14px",
+                border: "1px solid #4285F4",
+                boxShadow: "0 4px 10px rgba(66,133,244,0.1)",
+                transition: "all 0.2s",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px"
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#4285F410"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "white"; }}
+            >
+              <span style={{ fontSize: "18px" }}>📸</span> View Photos
+            </a>
             <button
               onClick={onClose}
               style={{
