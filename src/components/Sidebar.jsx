@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import SkeletonCards from "./SkeletonCards";
 
-export default function Sidebar({ 
-  places, 
-  selectedPlace, 
-  onSelect, 
+export default function Sidebar({
+  places,
+  selectedPlace,
+  onSelect,
   userLocation,
   category,
   setCategory,
@@ -19,43 +19,12 @@ export default function Sidebar({
   loading,
   isMobile,
   mobileSheetState,
-  setMobileSheetState
+  setMobileSheetState,
+  wikiData
 }) {
-  const [wikiData, setWikiData] = useState({}); // Stores { [name]: { img, extract } }
   const cardRefs = useRef({});
 
-  const fetchWikiInfo = async (name) => {
-    try {
-      const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`);
-      if (!res.ok) return null;
-      const data = await res.json();
-      return {
-        img: data.thumbnail?.source || null,
-        extract: data.extract || null
-      };
-    } catch { return null; }
-  };
 
-  useEffect(() => {
-    const loadWiki = async () => {
-      const placesWithNames = places.filter(p => p.properties.name);
-      const results = await Promise.allSettled(
-        placesWithNames.map(async (place) => {
-          const name = place.properties.name;
-          const info = await fetchWikiInfo(name);
-          return { name, info };
-        })
-      );
-      const newWiki = {};
-      results.forEach(result => {
-        if (result.status === "fulfilled" && result.value.info) {
-          newWiki[result.value.name] = result.value.info;
-        }
-      });
-      setWikiData(prev => ({ ...prev, ...newWiki }));
-    };
-    if (places.length > 0) loadWiki();
-  }, [places]);
 
   useEffect(() => {
     if (selectedPlace && cardRefs.current[selectedPlace.properties.place_id]) {
@@ -126,7 +95,7 @@ export default function Sidebar({
         const [endH, endM] = end.split(':').map(Number);
         const startTotal = startH * 60 + startM;
         const endTotal = endH * 60 + endM;
-        
+
         if (currentTime >= startTotal && currentTime <= endTotal) {
           return { status: 'Open Now', color: '#28a745' };
         } else {
@@ -137,6 +106,22 @@ export default function Sidebar({
     } catch {
       return null;
     }
+  };
+
+  const renderStars = (rating) => {
+    const fullStars = Math.floor(rating || 0);
+    return (
+      <div style={{ display: "inline-flex", gap: "1px" }}>
+        {[...Array(5)].map((_, i) => (
+          <span key={i} style={{ 
+            color: i < fullStars ? "#ffd700" : "#d1d5db",
+            fontSize: "14px"
+          }}>
+            ★
+          </span>
+        ))}
+      </div>
+    );
   };
 
   const mobileVariants = {
@@ -171,7 +156,7 @@ export default function Sidebar({
   };
 
   return (
-    <motion.div 
+    <motion.div
       style={containerStyle}
       initial={isMobile ? "collapsed" : false}
       animate={isMobile ? mobileSheetState : false}
@@ -193,7 +178,7 @@ export default function Sidebar({
       }}
     >
       {isMobile && (
-        <div 
+        <div
           onClick={() => {
             if (mobileSheetState === "collapsed") setMobileSheetState("half");
             else if (mobileSheetState === "half") setMobileSheetState("full");
@@ -206,14 +191,14 @@ export default function Sidebar({
       )}
       <div style={{ padding: isMobile ? "0 20px 10px 20px" : "20px 20px 10px 20px", background: headerBg, borderBottom: `1px solid ${borderColor}`, position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "12px" }}>
-          <button 
-            onClick={() => setSidebarView("explore")} 
+          <button
+            onClick={() => setSidebarView("explore")}
             style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "bold", background: sidebarView === "explore" ? "#000" : "#eee", color: sidebarView === "explore" ? "white" : "#333", transition: "0.2s" }}
           >
             Explore
           </button>
-          <button 
-            onClick={() => setSidebarView("itinerary")} 
+          <button
+            onClick={() => setSidebarView("itinerary")}
             style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "bold", background: sidebarView === "itinerary" ? "#000" : "#eee", color: sidebarView === "itinerary" ? "white" : "#333", transition: "0.2s" }}
           >
             My Itinerary ({itinerary?.length || 0})
@@ -279,9 +264,9 @@ export default function Sidebar({
 
                 const isSelected = selectedPlace?.properties?.place_id === place_id;
                 const isHovered = hoverPlaceId === place_id;
-                
+
                 const meta = getPlaceMeta(categories, place_id);
-                
+
                 let displayDistance = null;
                 if (userLocation) {
                   if (isSelected && routeInfo) {
@@ -296,8 +281,8 @@ export default function Sidebar({
                   <motion.div
                     key={place_id || name}
                     initial={{ opacity: 0, y: 20 }}
-                    animate={{ 
-                      opacity: 1, 
+                    animate={{
+                      opacity: 1,
                       y: 0,
                       scale: isSelected || isHovered ? 1.02 : 1,
                       x: isSelected || isHovered ? 8 : 0
@@ -314,8 +299,8 @@ export default function Sidebar({
                       overflow: "hidden",
                       cursor: "pointer",
                       border: isSelected || isHovered ? `2px solid ${meta.color}` : `1px solid ${borderColor}`,
-                      boxShadow: isSelected || isHovered 
-                        ? `0 15px 30px rgba(${meta.color === '#007bff' ? '0,123,255' : meta.color === '#28a745' ? '40,167,69' : meta.color === '#ffc107' ? '255,193,7' : '0,0,0'},0.15)` 
+                      boxShadow: isSelected || isHovered
+                        ? `0 15px 30px rgba(${meta.color === '#007bff' ? '0,123,255' : meta.color === '#28a745' ? '40,167,69' : meta.color === '#ffc107' ? '255,193,7' : '0,0,0'},0.15)`
                         : "0 4px 15px rgba(0,0,0,0.04)",
                     }}
                   >
@@ -325,16 +310,30 @@ export default function Sidebar({
                         {meta.type}
                       </div>
                       {rating && (
-                        <div style={{ position: "absolute", top: "10px", right: "10px", background: "#333", color: "#ffd700", padding: "4px 8px", borderRadius: "8px", fontSize: "12px", fontWeight: "bold", display: "flex", alignItems: "center", gap: "4px", boxShadow: "0 2px 5px rgba(0,0,0,0.2)" }}>
-                          ⭐ {Number(rating).toFixed(1)}
+                        <div style={{ 
+                          position: "absolute", 
+                          top: "10px", 
+                          right: "10px", 
+                          background: "rgba(255,255,255,0.95)", 
+                          padding: "4px 8px", 
+                          borderRadius: "12px", 
+                          boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+                          display: "flex", 
+                          alignItems: "center", 
+                          gap: "4px" 
+                        }}>
+                          {renderStars(rating)}
+                          <span style={{ fontSize: "11px", fontWeight: "bold", color: "#333", marginLeft: "2px" }}>
+                            {Number(rating).toFixed(1)}
+                          </span>
                         </div>
                       )}
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleItinerary(place); }}
                         style={{
-                          position: "absolute", bottom: "10px", left: "10px", 
-                          background: itinerary.some(p => p.properties.place_id === place_id) ? "#ff4d4d" : "rgba(255,255,255,0.9)", 
-                          color: itinerary.some(p => p.properties.place_id === place_id) ? "white" : "#333", 
+                          position: "absolute", bottom: "10px", left: "10px",
+                          background: itinerary.some(p => p.properties.place_id === place_id) ? "#ff4d4d" : "rgba(255,255,255,0.9)",
+                          color: itinerary.some(p => p.properties.place_id === place_id) ? "white" : "#333",
                           border: "none", padding: "6px 15px", borderRadius: "20px", fontSize: "12px", fontWeight: "bold", cursor: "pointer",
                           boxShadow: "0 2px 5px rgba(0,0,0,0.2)", transition: "0.2s"
                         }}
@@ -348,10 +347,10 @@ export default function Sidebar({
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}>
                         <h4 style={{ margin: 0, fontSize: "15px", color: textColor, lineHeight: "1.3", flex: 1 }}>{name}</h4>
                         {opening_hours && (
-                          <div style={{ 
-                            fontSize: "10px", 
-                            fontWeight: "800", 
-                            color: isOpen(opening_hours)?.color || "#6c757d", 
+                          <div style={{
+                            fontSize: "10px",
+                            fontWeight: "800",
+                            color: isOpen(opening_hours)?.color || "#6c757d",
                             textTransform: "uppercase",
                             letterSpacing: "0.5px",
                             padding: "2px 6px",
@@ -367,24 +366,24 @@ export default function Sidebar({
                       <p style={{ fontSize: "12px", color: subtextColor, marginBottom: "16px", lineHeight: "1.4", overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                         {wikiData[name]?.extract || formatted}
                       </p>
-                      
+
                       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
                         {contact?.phone && (
-                          <div 
-                            style={{ 
-                              display: "flex", 
-                              alignItems: "center", 
-                              gap: "6px", 
-                              fontSize: "11px", 
-                              color: textColor, 
-                              background: "#f0f2f5", 
-                              padding: "8px 12px", 
-                              borderRadius: "10px", 
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              fontSize: "11px",
+                              color: textColor,
+                              background: "#f0f2f5",
+                              padding: "8px 12px",
+                              borderRadius: "10px",
                               fontWeight: "600",
                               cursor: "pointer",
                               border: "1px solid #e0e0e0",
                               transition: "all 0.2s"
-                            }} 
+                            }}
                             onClick={(e) => { e.stopPropagation(); window.location.href = `tel:${contact.phone}`; }}
                             onMouseEnter={(e) => e.currentTarget.style.background = "#e8eaed"}
                             onMouseLeave={(e) => e.currentTarget.style.background = "#f0f2f5"}
@@ -393,26 +392,26 @@ export default function Sidebar({
                           </div>
                         )}
                         {website && (
-                          <a 
-                            href={website} 
-                            target="_blank" 
-                            rel="noreferrer" 
-                            onClick={(e) => e.stopPropagation()} 
-                            style={{ 
-                              display: "flex", 
-                              alignItems: "center", 
-                              gap: "6px", 
-                              fontSize: "11px", 
-                              color: "white", 
-                              background: "linear-gradient(135deg, #007bff, #0056b3)", 
-                              padding: "8px 14px", 
-                              borderRadius: "10px", 
-                              textDecoration: "none", 
-                              fontWeight: "600", 
-                              boxShadow: "0 4px 8px rgba(0,123,255,0.2)", 
-                              transition: "all 0.2s" 
-                            }} 
-                            onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-1px)"} 
+                          <a
+                            href={website}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              fontSize: "11px",
+                              color: "white",
+                              background: "linear-gradient(135deg, #007bff, #0056b3)",
+                              padding: "8px 14px",
+                              borderRadius: "10px",
+                              textDecoration: "none",
+                              fontWeight: "600",
+                              boxShadow: "0 4px 8px rgba(0,123,255,0.2)",
+                              transition: "all 0.2s"
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-1px)"}
                             onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
                           >
                             🌐 <span>Website</span>

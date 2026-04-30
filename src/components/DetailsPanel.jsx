@@ -1,6 +1,24 @@
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function DetailsPanel({ place, onClose, isMobile }) {
+export default function DetailsPanel({ place, onClose, isMobile, wikiData }) {
+  const renderStars = (rating) => {
+    const fullStars = Math.floor(rating || 0);
+    return (
+      <div style={{ display: "inline-flex", gap: "2px", marginBottom: "15px" }}>
+        {[...Array(5)].map((_, i) => (
+          <span key={i} style={{ 
+            color: i < fullStars ? "#ffd700" : "#d1d5db",
+            fontSize: "18px"
+          }}>
+            ★
+          </span>
+        ))}
+        <span style={{ fontSize: "14px", fontWeight: "bold", color: "#666", marginLeft: "6px", alignSelf: "center" }}>
+          {Number(rating || 0).toFixed(1)}
+        </span>
+      </div>
+    );
+  };
   return (
     <AnimatePresence>
       {place && (
@@ -34,7 +52,7 @@ export default function DetailsPanel({ place, onClose, isMobile }) {
           }}
         >
           {isMobile && (
-            <div 
+            <div
               style={{ width: "100%", position: "absolute", top: "12px", left: 0, display: "flex", justifyContent: "center", cursor: "grab" }}
             >
               <div style={{ width: "40px", height: "5px", background: "#d1d5db", borderRadius: "3px" }} />
@@ -63,47 +81,63 @@ export default function DetailsPanel({ place, onClose, isMobile }) {
             ✕
           </button>
 
-          <h2 style={{ marginTop: isMobile ? "10px" : 0, fontSize: isMobile ? "20px" : "24px", color: "#222" }}>
+          {wikiData?.[place.properties.name]?.img && (
+            <div style={{ width: "calc(100% + 40px)", margin: "-24px -20px 20px -20px", height: "200px", position: "relative", overflow: "hidden", borderRadius: isMobile ? "28px 28px 0 0" : "24px 24px 0 0" }}>
+              <img src={wikiData[place.properties.name].img} alt={place.properties.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "60px", background: "linear-gradient(to top, rgba(0,0,0,0.4), transparent)" }} />
+            </div>
+          )}
+
+          <h2 style={{ marginTop: isMobile && !wikiData?.[place.properties.name]?.img ? "10px" : 0, fontSize: isMobile ? "20px" : "24px", color: "#222", marginBottom: "8px" }}>
             {place.properties.name}
           </h2>
+          
+          {renderStars(place.properties.rating)}
 
           <p style={{ color: "#666", fontSize: "14px", lineHeight: "1.5", marginBottom: "15px" }}>
             {place.properties.formatted}
           </p>
 
-          <div style={{ marginBottom: "20px" }}>
+          <div style={{ marginBottom: "20px", background: "#f8fafc", padding: "15px", borderRadius: "16px", border: "1px solid #eef2f6" }}>
             {place.properties.opening_hours && (
-              <div style={{ marginBottom: "8px", fontSize: "13px", color: "#444", display: "flex", gap: "8px" }}>
-                <span>🕒</span>
+              <div style={{ marginBottom: "12px", fontSize: "13px", color: "#444", display: "flex", gap: "10px" }}>
+                <span style={{ fontSize: "16px" }}>🕒</span>
                 <div>
-                  <strong style={{ display: "block", fontSize: "11px", color: "#888", textTransform: "uppercase" }}>Opening Hours</strong>
+                  <strong style={{ display: "block", fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "2px" }}>Opening Hours</strong>
                   {place.properties.opening_hours}
                 </div>
               </div>
             )}
             
-            <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginBottom: "15px" }}>
+            <div style={{ display: "flex", gap: "25px", flexWrap: "wrap", marginBottom: "12px" }}>
               {place.properties.contact?.phone && (
                 <div style={{ fontSize: "13px", color: "#444" }}>
-                  <strong style={{ display: "block", fontSize: "11px", color: "#888", textTransform: "uppercase" }}>Phone</strong>
+                  <strong style={{ display: "block", fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "2px" }}>Phone</strong>
                   {place.properties.contact.phone}
                 </div>
               )}
               {place.properties.contact?.email && (
                 <div style={{ fontSize: "13px", color: "#444" }}>
-                  <strong style={{ display: "block", fontSize: "11px", color: "#888", textTransform: "uppercase" }}>Email</strong>
+                  <strong style={{ display: "block", fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "2px" }}>Email</strong>
                   {place.properties.contact.email}
                 </div>
               )}
             </div>
 
             {place.properties.facilities && (
-              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "10px" }}>
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "10px", borderTop: "1px solid #eee", paddingTop: "10px" }}>
                  {Object.entries(place.properties.facilities).filter(([_, v]) => v === true).map(([key]) => (
-                   <span key={key} style={{ background: "#f0f2f5", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", color: "#555" }}>
-                     ✓ {key.replace(/_/g, ' ')}
+                   <span key={key} style={{ background: "white", padding: "4px 10px", borderRadius: "20px", fontSize: "10px", fontWeight: "700", color: "#555", border: "1px solid #e2e8f0", textTransform: "capitalize" }}>
+                     {key.replace(/_/g, ' ')}
                    </span>
                  ))}
+              </div>
+            )}
+
+            {wikiData?.[place.properties.name]?.extract && (
+              <div style={{ marginTop: "12px", fontSize: "13px", color: "#555", lineHeight: "1.6", borderTop: "1px solid #eee", paddingTop: "12px" }}>
+                <strong style={{ display: "block", fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "4px" }}>About</strong>
+                {wikiData[place.properties.name].extract}
               </div>
             )}
           </div>
@@ -114,7 +148,7 @@ export default function DetailsPanel({ place, onClose, isMobile }) {
                 href={place.properties.website}
                 target="_blank"
                 rel="noreferrer"
-                style={{ 
+                style={{
                   flex: 1,
                   textAlign: "center",
                   background: "linear-gradient(135deg, #007bff, #0056b3)",
@@ -131,23 +165,23 @@ export default function DetailsPanel({ place, onClose, isMobile }) {
                 Visit Website
               </a>
             )}
-              <button
-                 onClick={onClose}
-                 style={{ 
-                    flex: 1,
-                    background: "#f0f2f5",
-                    color: "#333",
-                    padding: "14px",
-                    borderRadius: "14px",
-                    border: "none",
-                    fontWeight: "600",
-                    fontSize: "15px",
-                    cursor: "pointer",
-                    transition: "all 0.2s"
-                  }}
-              >
-                Close
-              </button>
+            <button
+              onClick={onClose}
+              style={{
+                flex: 1,
+                background: "#f0f2f5",
+                color: "#333",
+                padding: "14px",
+                borderRadius: "14px",
+                border: "none",
+                fontWeight: "600",
+                fontSize: "15px",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              Close
+            </button>
           </div>
         </motion.div>
       )}

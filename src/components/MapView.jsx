@@ -35,6 +35,7 @@ export default function MapView() {
   const [loading, setLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [mobileSheetState, setMobileSheetState] = useState("collapsed");
+  const [wikiData, setWikiData] = useState({});
 
   // Resize listener for mobile detection
   useEffect(() => {
@@ -89,7 +90,7 @@ export default function MapView() {
               categories: place.properties.categories || [],
               formatted: place.properties.formatted || "No address",
               website: place.properties.website || null,
-              contact: { 
+              contact: {
                 phone: place.properties.contact?.phone || null,
                 email: place.properties.contact?.email || null
               },
@@ -112,6 +113,43 @@ export default function MapView() {
     };
     fetchPlaces();
   }, [position]);
+
+  // Wikipedia Data Fetching
+  useEffect(() => {
+    const fetchWikiInfo = async (name) => {
+      try {
+        const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return {
+          img: data.thumbnail?.source || null,
+          extract: data.extract || null
+        };
+      } catch { return null; }
+    };
+
+    const loadWiki = async () => {
+      const placesWithNames = places.filter(p => p.properties.name);
+      const results = await Promise.allSettled(
+        placesWithNames.map(async (place) => {
+          const name = place.properties.name;
+          if (wikiData[name]) return null;
+          const info = await fetchWikiInfo(name);
+          return { name, info };
+        })
+      );
+      const newWiki = {};
+      results.forEach(result => {
+        if (result.status === "fulfilled" && result.value?.info) {
+          newWiki[result.value.name] = result.value.info;
+        }
+      });
+      if (Object.keys(newWiki).length > 0) {
+        setWikiData(prev => ({ ...prev, ...newWiki }));
+      }
+    };
+    if (places.length > 0) loadWiki();
+  }, [places]);
 
   // Fetch driving route
   useEffect(() => {
@@ -252,6 +290,7 @@ export default function MapView() {
         isMobile={isMobile}
         mobileSheetState={mobileSheetState}
         setMobileSheetState={setMobileSheetState}
+        wikiData={wikiData}
       />
 
       <div style={{ flex: 1, position: "relative" }}>
@@ -312,10 +351,11 @@ export default function MapView() {
         </MapContainer>
 
         <RouteInfoBadge routeInfo={routeInfo} />
-        <DetailsPanel 
-          place={selectedPlace} 
-          onClose={() => setSelectedPlace(null)} 
+        <DetailsPanel
+          place={selectedPlace}
+          onClose={() => setSelectedPlace(null)}
           isMobile={isMobile}
+          wikiData={wikiData}
         />
 
         {/* Floating Action Button for Mobile Toggle */}
