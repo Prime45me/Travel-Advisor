@@ -5,7 +5,15 @@ export default function DroppedPinMarker({ droppedPin, setDroppedPin, setPositio
   if (!droppedPin) return null;
 
   return (
-    <Marker position={[droppedPin.lat, droppedPin.lng]} icon={droppedPinIcon}>
+    <Marker 
+      position={[droppedPin.lat, droppedPin.lng]} 
+      icon={droppedPinIcon}
+      eventHandlers={{
+        click: (e) => {
+          if (e.originalEvent) e.originalEvent.stopPropagation();
+        }
+      }}
+    >
       <Popup>
         <div style={{ minWidth: '220px', fontFamily: 'Segoe UI, sans-serif' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>

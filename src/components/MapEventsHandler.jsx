@@ -17,9 +17,7 @@ export default function MapEventsHandler({ setSelectedPlace, setDroppedPin }) {
         setSelectedPlace(null);
       }
     },
-    zoomstart: () => {
-      setSelectedPlace(null);
-    },
+
     click: async (e) => {
       // Don't drop pin if user was dragging
       if (isDragging.current) return;

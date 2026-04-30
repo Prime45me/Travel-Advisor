@@ -21,7 +21,11 @@ export default function PlaceMarkers({ places, selectedPlace, hoverPlaceId, setH
         eventHandlers={{
           mouseover: () => setHoverPlaceId(place.properties.place_id),
           mouseout: () => setHoverPlaceId(null),
-          click: () => onSelect(place)
+          click: (e) => {
+            // Stop propagation to the map to prevent MapEventsHandler from closing the panel
+            if (e.originalEvent) e.originalEvent.stopPropagation();
+            onSelect(place);
+          }
         }}
       >
         <Popup>
