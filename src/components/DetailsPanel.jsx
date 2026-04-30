@@ -6,7 +6,7 @@ export default function DetailsPanel({ place, onClose, isMobile }) {
     return (
       <div style={{ display: "inline-flex", gap: "2px", marginBottom: "15px" }}>
         {[...Array(5)].map((_, i) => (
-          <span key={i} style={{ 
+          <span key={i} style={{
             color: i < fullStars ? "#ffd700" : "#d1d5db",
             fontSize: "18px"
           }}>
@@ -80,11 +80,11 @@ export default function DetailsPanel({ place, onClose, isMobile }) {
           >
             ✕
           </button>
- 
+
           <h2 style={{ marginTop: isMobile ? "10px" : 0, fontSize: isMobile ? "20px" : "24px", color: "#222", marginBottom: "12px" }}>
             {place.properties.name}
           </h2>
-          
+
           {renderStars(place.properties.rating)}
 
           <p style={{ color: "#666", fontSize: "14px", lineHeight: "1.5", marginBottom: "15px" }}>
@@ -93,15 +93,31 @@ export default function DetailsPanel({ place, onClose, isMobile }) {
 
           <div style={{ marginBottom: "20px", background: "#f8fafc", padding: "15px", borderRadius: "16px", border: "1px solid #eef2f6" }}>
             {place.properties.opening_hours && (
-              <div style={{ marginBottom: "12px", fontSize: "13px", color: "#444", display: "flex", gap: "10px" }}>
-                <span style={{ fontSize: "16px" }}>🕒</span>
-                <div>
-                  <strong style={{ display: "block", fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "2px" }}>Opening Hours</strong>
-                  {place.properties.opening_hours}
+              <div style={{ marginBottom: "16px" }}>
+                <strong style={{ display: "block", fontSize: "10px", color: "#888", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "8px" }}>Opening Hours</strong>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  {place.properties.opening_hours.split(';').map((segment, i) => (
+                    <div key={i} style={{ 
+                      background: "white", 
+                      border: "1px solid #eef2f6", 
+                      padding: "8px 12px", 
+                      borderRadius: "10px", 
+                      fontSize: "12px", 
+                      color: "#334155",
+                      fontWeight: "600",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      boxShadow: "0 2px 5px rgba(0,0,0,0.03)"
+                    }}>
+                      <span style={{ fontSize: "14px" }}>🕒</span>
+                      {segment.trim()}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
-            
+
             <div style={{ display: "flex", gap: "25px", flexWrap: "wrap", marginBottom: "12px" }}>
               {place.properties.contact?.phone && (
                 <div style={{ fontSize: "13px", color: "#444" }}>
@@ -119,11 +135,11 @@ export default function DetailsPanel({ place, onClose, isMobile }) {
 
             {place.properties.facilities && (
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "10px", borderTop: "1px solid #eee", paddingTop: "10px" }}>
-                 {Object.entries(place.properties.facilities).filter(([_, v]) => v === true).map(([key]) => (
-                   <span key={key} style={{ background: "white", padding: "4px 10px", borderRadius: "20px", fontSize: "10px", fontWeight: "700", color: "#555", border: "1px solid #e2e8f0", textTransform: "capitalize" }}>
-                     {key.replace(/_/g, ' ')}
-                   </span>
-                 ))}
+                {Object.entries(place.properties.facilities).filter(([_, v]) => v === true).map(([key]) => (
+                  <span key={key} style={{ background: "white", padding: "4px 10px", borderRadius: "20px", fontSize: "10px", fontWeight: "700", color: "#555", border: "1px solid #e2e8f0", textTransform: "capitalize" }}>
+                    {key.replace(/_/g, ' ')}
+                  </span>
+                ))}
               </div>
             )}
           </div>
@@ -151,33 +167,6 @@ export default function DetailsPanel({ place, onClose, isMobile }) {
                 Visit Website
               </a>
             )}
-            <a
-              href={`https://www.google.com/maps/search/${encodeURIComponent(place.properties.name + " " + place.properties.formatted)}`}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                flex: 1,
-                textAlign: "center",
-                background: "white",
-                color: "#4285F4",
-                padding: "14px",
-                borderRadius: "14px",
-                textDecoration: "none",
-                fontWeight: "600",
-                fontSize: "14px",
-                border: "1px solid #4285F4",
-                boxShadow: "0 4px 10px rgba(66,133,244,0.1)",
-                transition: "all 0.2s",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "8px"
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "#4285F410"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "white"; }}
-            >
-              <span style={{ fontSize: "18px" }}>📸</span> View Photos
-            </a>
             <button
               onClick={onClose}
               style={{
